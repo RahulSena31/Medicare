@@ -1,0 +1,1181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MediCare – Smart Medicine Reminder App (College Mini Project Demo)</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230284c7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z'/><path d='m8.5 8.5 7 7'/></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- Embedded Medicare CSS -->
+  <link rel="stylesheet" href="./src/index.css">
+
+  <!-- React 18 & Babel CDN for Zero-Config Direct Browser Run -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- Standalone Application Script (Babel compiled) -->
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // --- Audio Chime ---
+    function playChimeSound() {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+        const notes = [523.25, 659.25, 783.99];
+        const startTime = ctx.currentTime;
+        notes.forEach((freq, index) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, startTime + index * 0.12);
+          gain.gain.setValueAtTime(0, startTime + index * 0.12);
+          gain.gain.linearRampToValueAtTime(0.18, startTime + index * 0.12 + 0.03);
+          gain.gain.exponentialRampToValueAtTime(0.001, startTime + index * 0.12 + 0.45);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(startTime + index * 0.12);
+          osc.stop(startTime + index * 0.12 + 0.5);
+        });
+      } catch (e) {
+        console.warn('Audio chime note:', e);
+      }
+    }
+
+    // --- Icons ---
+    const Pill = ({ size = 20, className = '' }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z" />
+        <path d="m8.5 8.5 7 7" />
+      </svg>
+    );
+    const Tablet = ({ size = 20, className = '' }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 3v18" />
+      </svg>
+    );
+    const Droplet = ({ size = 20, className = '' }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z" />
+      </svg>
+    );
+    const Beaker = ({ size = 20, className = '' }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M4.5 3h15" /><path d="M6 3v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V3" /><path d="M6 14h12" />
+      </svg>
+    );
+    const Syringe = ({ size = 20, className = '' }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="m18 2 4 4" /><path d="m17 7 3-3" /><path d="M19 9 8.7 19.3c-1 1-2.5 1-3.4 0l-.6-.6c-1-1-1-2.5 0-3.4L15 5" /><path d="m9 11 4 4" /><path d="m5 19-3 3" /><path d="m14 4 6 6" />
+      </svg>
+    );
+    const Clock = ({ size = 20, className = '' }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+      </svg>
+    );
+    const Calendar = ({ size = 20, className = '' }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <rect width="18" height="18" x="3" y="4" rx="2" ry="2" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" />
+      </svg>
+    );
+    const CheckCircle2 = ({ size = 20, className = '' }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" /><path d="m9 12 2 2 4-4" />
+      </svg>
+    );
+    const XCircle = ({ size = 20, className = '' }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <circle cx="12" cy="12" r="10" /><path d="m15 9-6 6" /><path d="m9 9 6 6" />
+      </svg>
+    );
+    const AlertCircle = ({ size = 20, className = '' }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" />
+      </svg>
+    );
+    const Plus = ({ size = 20, className = '' }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M5 12h14" /><path d="M12 5v14" />
+      </svg>
+    );
+    const Search = ({ size = 20, className = '' }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+      </svg>
+    );
+    const Trash2 = ({ size = 20, className = '' }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+        <line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" />
+      </svg>
+    );
+    const Edit3 = ({ size = 20, className = '' }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+      </svg>
+    );
+    const BellRing = ({ size = 20, className = '' }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+        <path d="M4 2C2.8 3.7 2 5.7 2 8" /><path d="M22 8c0-2.3-.8-4.3-2-6" />
+      </svg>
+    );
+    const Activity = ({ size = 20, className = '' }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+      </svg>
+    );
+    const HeartPulse = ({ size = 20, className = '' }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+        <path d="M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27" />
+      </svg>
+    );
+    const Sparkles = ({ size = 20, className = '' }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" />
+      </svg>
+    );
+    const ShieldCheck = ({ size = 20, className = '' }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" /><path d="m9 12 2 2 4-4" />
+      </svg>
+    );
+    const Utensils = ({ size = 20, className = '' }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M18 2v6a3 3 0 0 1-3 3 3 3 0 0 1-3-3V2" /><path d="M15 2v14a3 3 0 0 1-3 3h-1" /><path d="M5 2v8a3 3 0 0 0 3 3h1v7a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2v-7" />
+      </svg>
+    );
+    const Check = ({ size = 20, className = '' }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <polyline points="20 6 9 17 4 12" />
+      </svg>
+    );
+    const X = ({ size = 20, className = '' }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M18 6 6 18" /><path d="m6 6 12 12" />
+      </svg>
+    );
+    const Menu = ({ size = 20, className = '' }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <line x1="4" x2="20" y1="12" y2="12" /><line x1="4" x2="20" y1="6" y2="6" /><line x1="4" x2="20" y1="18" y2="18" />
+      </svg>
+    );
+    const LayoutDashboard = ({ size = 20, className = '' }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <rect width="7" height="9" x="3" y="3" rx="1" /><rect width="7" height="5" x="14" y="3" rx="1" /><rect width="7" height="9" x="14" y="12" rx="1" /><rect width="7" height="5" x="3" y="16" rx="1" />
+      </svg>
+    );
+    const CalendarDays = ({ size = 20, className = '' }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <rect width="18" height="18" x="3" y="4" rx="2" ry="2" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" /><path d="M8 14h.01" /><path d="M12 14h.01" /><path d="M16 14h.01" /><path d="M8 18h.01" /><path d="M12 18h.01" /><path d="M16 18h.01" />
+      </svg>
+    );
+    const FilePlus2 = ({ size = 20, className = '' }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M4 22h14a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v4" /><path d="M14 2v4a2 2 0 0 0 2 2h4" /><path d="M3 15h6" /><path d="M6 12v6" />
+      </svg>
+    );
+    const Volume2 = ({ size = 20, className = '' }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+      </svg>
+    );
+    const Info = ({ size = 20, className = '' }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="16" y2="12" /><line x1="12" x2="12.01" y1="8" y2="8" />
+      </svg>
+    );
+
+    // Initial Data
+    const initialMedicines = [
+      {
+        id: 'med-1',
+        name: 'Paracetamol 650mg',
+        dosage: '1 Tablet',
+        type: 'Tablet',
+        time: '08:00',
+        startDate: '2026-11-23',
+        endDate: '',
+        foodInstruction: 'After food',
+        notes: 'Take with water after breakfast for mild fever or body ache.',
+        status: 'taken',
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'med-2',
+        name: 'Amoxicillin 500mg',
+        dosage: '1 Capsule',
+        type: 'Capsule',
+        time: '13:30',
+        startDate: '2026-11-23',
+        endDate: '',
+        foodInstruction: 'Before food',
+        notes: 'Prescribed antibiotic. Finish full 5-day course as advised.',
+        status: 'pending',
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'med-3',
+        name: 'Benadryl Cough Syrup',
+        dosage: '10 ml',
+        type: 'Syrup',
+        time: '17:00',
+        startDate: '2026-11-23',
+        endDate: '',
+        foodInstruction: 'After food',
+        notes: 'Use measuring cup provided. Drink warm water afterwards.',
+        status: 'pending',
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'med-4',
+        name: 'Refresh Tears Eye Drops',
+        dosage: '2 Drops',
+        type: 'Drops',
+        time: '21:00',
+        startDate: '2026-11-23',
+        endDate: '',
+        foodInstruction: 'After food',
+        notes: 'Apply gently in each eye before sleeping.',
+        status: 'pending',
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'med-5',
+        name: 'Vitamin D3 & Calcium',
+        dosage: '1 Tablet',
+        type: 'Tablet',
+        time: '22:30',
+        startDate: '2026-11-23',
+        endDate: '',
+        foodInstruction: 'With food',
+        notes: 'Best absorbed when taken with milk or after dinner.',
+        status: 'skipped',
+        updatedAt: new Date().toISOString(),
+      }
+    ];
+
+    const healthTips = [
+      { id: 1, tip: "Consistency is key! Taking medications at the same time every day ensures maximum therapeutic benefit.", category: "Routine" },
+      { id: 2, tip: "Drink at least 8 glasses of fresh water daily to help your kidneys efficiently process medications.", category: "Hydration" },
+      { id: 3, tip: "Always check food instructions! Some medicines work better on an empty stomach, while others require food.", category: "Safety" },
+      { id: 4, tip: "Store your medicines in a cool, dry place away from direct sunlight and out of children's reach.", category: "Storage" },
+      { id: 5, tip: "Never skip antibiotic doses even if you feel completely cured; complete the full prescribed course.", category: "Antibiotics" }
+    ];
+
+    // --- Sub-components ---
+    const Toast = ({ toast, onClose }) => {
+      useEffect(() => {
+        const timer = setTimeout(() => onClose(toast.id), 4000);
+        return () => clearTimeout(timer);
+      }, [toast.id, onClose]);
+
+      return (
+        <div className="toast-item animate-slide-in">
+          <div className="toast-icon">
+            {toast.type === 'success' && <CheckCircle2 size={18} className="text-emerald-600" />}
+            {toast.type === 'warning' && <AlertCircle size={18} className="text-amber-600" />}
+            {toast.type === 'info' && <Info size={18} className="text-sky-600" />}
+          </div>
+          <div className="toast-content"><span className="toast-message">{toast.message}</span></div>
+          <button type="button" onClick={() => onClose(toast.id)} className="toast-close-btn"><X size={15} /></button>
+        </div>
+      );
+    };
+
+    const ToastContainer = ({ toasts, onClose }) => {
+      if (!toasts || toasts.length === 0) return null;
+      return (
+        <div className="toast-container">
+          {toasts.map(toast => <Toast key={toast.id} toast={toast} onClose={onClose} />)}
+        </div>
+      );
+    };
+
+    const DeleteConfirmModal = ({ medicine, onConfirm, onCancel }) => {
+      if (!medicine) return null;
+      return (
+        <div className="modal-backdrop">
+          <div className="modal-card delete-modal-card animate-scale-up">
+            <div className="delete-modal-header">
+              <div className="delete-icon-wrapper"><Trash2 size={24} className="text-rose-600" /></div>
+              <button type="button" className="modal-close-btn" onClick={onCancel}><X size={18} /></button>
+            </div>
+            <div className="delete-modal-body">
+              <h3 className="delete-modal-title">Delete Medication Schedule?</h3>
+              <p className="delete-modal-description">Are you sure you want to remove <strong>"{medicine.name}"</strong> ({medicine.dosage}) from your reminder list?</p>
+              <div className="delete-medicine-summary">
+                <span className="summary-chip">Type: {medicine.type}</span>
+                <span className="summary-chip">Time: {medicine.time}</span>
+                <span className="summary-chip">Food: {medicine.foodInstruction}</span>
+              </div>
+              <p className="delete-modal-warning"><AlertCircle size={14} className="inline mr-1" /> This action cannot be undone for this session.</p>
+            </div>
+            <div className="delete-modal-actions">
+              <button type="button" className="btn btn-secondary" onClick={onCancel}>Cancel</button>
+              <button type="button" className="btn btn-danger" onClick={() => onConfirm(medicine.id)}><Trash2 size={16} /> Yes, Delete</button>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    const ReminderNotification = ({ reminder, onDismiss, onMarkTaken }) => {
+      if (!reminder) return null;
+      const formatTime = (t) => {
+        if (!t) return '';
+        const [h, m] = t.split(':');
+        const hr = parseInt(h, 10);
+        return `${hr % 12 || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`;
+      };
+      return (
+        <div className="reminder-overlay-backdrop">
+          <div className="reminder-popup-card animate-bounce-subtle">
+            <div className="reminder-popup-header">
+              <div className="reminder-bell-badge"><BellRing size={26} className="animate-ring" /></div>
+              <div className="reminder-header-titles">
+                <span className="reminder-badge-tag">MEDICINE DUE NOW</span>
+                <h3 className="reminder-alert-title">Time to Take Your Medicine!</h3>
+              </div>
+              <button type="button" className="reminder-close-btn" onClick={() => onDismiss(reminder.id)}><X size={18} /></button>
+            </div>
+            <div className="reminder-medicine-box">
+              <div className="reminder-med-icon-wrap"><Pill size={28} className="text-sky-600" /></div>
+              <div className="reminder-med-details">
+                <h4 className="reminder-med-name">{reminder.name}</h4>
+                <div className="reminder-tags-row">
+                  <span className="reminder-chip dosage-chip">Dosage: {reminder.dosage}</span>
+                  <span className="reminder-chip type-chip">{reminder.type}</span>
+                </div>
+              </div>
+            </div>
+            <div className="reminder-schedule-info">
+              <div className="reminder-info-tile">
+                <Clock size={16} className="text-sky-600" />
+                <div className="tile-text">
+                  <span className="tile-label">Scheduled Time</span>
+                  <strong className="tile-val">{formatTime(reminder.time)}</strong>
+                </div>
+              </div>
+              <div className="reminder-info-tile">
+                <Utensils size={16} className="text-teal-600" />
+                <div className="tile-text">
+                  <span className="tile-label">Food Instruction</span>
+                  <strong className="tile-val">{reminder.foodInstruction}</strong>
+                </div>
+              </div>
+            </div>
+            {reminder.notes && (
+              <div className="reminder-notes-box"><p><strong>Note:</strong> {reminder.notes}</p></div>
+            )}
+            <div className="reminder-sound-alert">
+              <Volume2 size={14} className="text-teal-600" />
+              <span>Audio reminder sounded • Safe & timely intake protects your health</span>
+            </div>
+            <div className="reminder-actions-row">
+              <button type="button" className="btn btn-secondary reminder-dismiss-btn" onClick={() => onDismiss(reminder.id)}>Dismiss for Now</button>
+              <button type="button" className="btn btn-primary reminder-take-btn" onClick={() => onMarkTaken(reminder.id)}><Check size={18} /> Mark as Taken</button>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    const AddMedicineForm = ({ isOpen, onClose, onSubmit, initialData }) => {
+      const isEditMode = Boolean(initialData);
+      const [formData, setFormData] = useState({
+        name: '', dosage: '', type: 'Tablet', time: '08:00',
+        startDate: new Date().toISOString().split('T')[0], endDate: '',
+        foodInstruction: 'After food', notes: ''
+      });
+      const [errors, setErrors] = useState({});
+      const [touched, setTouched] = useState({});
+
+      useEffect(() => {
+        if (initialData) {
+          setFormData({ ...initialData });
+        } else {
+          setFormData({
+            name: '', dosage: '', type: 'Tablet', time: '08:00',
+            startDate: new Date().toISOString().split('T')[0], endDate: '',
+            foodInstruction: 'After food', notes: ''
+          });
+        }
+        setErrors({});
+        setTouched({});
+      }, [initialData, isOpen]);
+
+      if (!isOpen) return null;
+
+      const types = [
+        { id: 'Tablet', label: 'Tablet', icon: <Tablet size={18} /> },
+        { id: 'Capsule', label: 'Capsule', icon: <Pill size={18} /> },
+        { id: 'Syrup', label: 'Syrup', icon: <Beaker size={18} /> },
+        { id: 'Drops', label: 'Drops', icon: <Droplet size={18} /> },
+        { id: 'Other', label: 'Other', icon: <Syringe size={18} /> }
+      ];
+
+      const foods = [
+        { id: 'Before food', label: 'Before Food' },
+        { id: 'After food', label: 'After Food' },
+        { id: 'With food', label: 'With Food' }
+      ];
+
+      const validate = () => {
+        const errs = {};
+        if (!formData.name.trim()) errs.name = 'Medicine name is required.';
+        if (!formData.dosage.trim()) errs.dosage = 'Dosage is required (e.g. 1 Tablet, 5 ml).';
+        if (!formData.time) errs.time = 'Reminder time is required.';
+        if (!formData.startDate) errs.startDate = 'Start date is required.';
+        return errs;
+      };
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        const errs = validate();
+        if (Object.keys(errs).length > 0) {
+          setErrors(errs);
+          setTouched({ name: true, dosage: true, time: true, startDate: true });
+          return;
+        }
+        onSubmit({
+          ...formData,
+          id: initialData ? initialData.id : `med-${Date.now()}`,
+          status: initialData ? initialData.status : 'pending',
+          updatedAt: new Date().toISOString()
+        });
+        onClose();
+      };
+
+      return (
+        <div className="modal-backdrop">
+          <div className="modal-card form-modal-card animate-scale-up">
+            <div className="modal-header">
+              <div className="modal-title-group">
+                <div className="modal-header-icon">
+                  {isEditMode ? <Edit3 size={20} className="text-sky-600" /> : <Plus size={20} className="text-teal-600" />}
+                </div>
+                <div>
+                  <h3 className="modal-title">{isEditMode ? 'Edit Medicine Schedule' : 'Add New Medicine'}</h3>
+                  <p className="modal-subtitle">Configure dosage, schedule and instructions</p>
+                </div>
+              </div>
+              <button type="button" className="modal-close-btn" onClick={onClose}><X size={18} /></button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="medicine-form">
+              <div className="form-grid form-grid-2">
+                <div className="form-field">
+                  <label className="form-label">Medicine Name *</label>
+                  <input
+                    type="text"
+                    className={`form-input ${touched.name && errors.name ? 'input-error' : ''}`}
+                    placeholder="e.g. Amoxicillin 500mg"
+                    value={formData.name}
+                    onChange={e => setFormData({ ...formData, name: e.target.value })}
+                    onBlur={() => setTouched({ ...touched, name: true })}
+                  />
+                  {touched.name && errors.name && <div className="field-error-message"><AlertCircle size={13} /> {errors.name}</div>}
+                </div>
+
+                <div className="form-field">
+                  <label className="form-label">Dosage *</label>
+                  <input
+                    type="text"
+                    className={`form-input ${touched.dosage && errors.dosage ? 'input-error' : ''}`}
+                    placeholder="e.g. 1 tablet, 5 ml"
+                    value={formData.dosage}
+                    onChange={e => setFormData({ ...formData, dosage: e.target.value })}
+                    onBlur={() => setTouched({ ...touched, dosage: true })}
+                  />
+                  {touched.dosage && errors.dosage && <div className="field-error-message"><AlertCircle size={13} /> {errors.dosage}</div>}
+                </div>
+              </div>
+
+              <div className="form-field">
+                <label className="form-label">Medicine Type *</label>
+                <div className="type-buttons-selector">
+                  {types.map(t => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      className={`type-select-btn ${formData.type === t.id ? 'type-btn-active' : ''}`}
+                      onClick={() => setFormData({ ...formData, type: t.id })}
+                    >
+                      <span className="type-btn-icon">{t.icon}</span>
+                      <span className="type-btn-label">{t.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="form-grid form-grid-3">
+                <div className="form-field">
+                  <label className="form-label">Reminder Time *</label>
+                  <div className="input-with-icon">
+                    <Clock size={16} className="input-icon" />
+                    <input
+                      type="time"
+                      className={`form-input pl-10 ${touched.time && errors.time ? 'input-error' : ''}`}
+                      value={formData.time}
+                      onChange={e => setFormData({ ...formData, time: e.target.value })}
+                      onBlur={() => setTouched({ ...touched, time: true })}
+                    />
+                  </div>
+                  {touched.time && errors.time && <div className="field-error-message"><AlertCircle size={13} /> {errors.time}</div>}
+                </div>
+
+                <div className="form-field">
+                  <label className="form-label">Start Date *</label>
+                  <div className="input-with-icon">
+                    <Calendar size={16} className="input-icon" />
+                    <input
+                      type="date"
+                      className="form-input pl-10"
+                      value={formData.startDate}
+                      onChange={e => setFormData({ ...formData, startDate: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="form-field">
+                  <label className="form-label">End Date <span className="text-slate-400 font-normal">(Opt)</span></label>
+                  <div className="input-with-icon">
+                    <Calendar size={16} className="input-icon" />
+                    <input
+                      type="date"
+                      className="form-input pl-10"
+                      value={formData.endDate}
+                      onChange={e => setFormData({ ...formData, endDate: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="form-field">
+                <label className="form-label">Food Instructions *</label>
+                <div className="food-options-selector">
+                  {foods.map(f => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      className={`food-select-btn ${formData.foodInstruction === f.id ? 'food-btn-active' : ''}`}
+                      onClick={() => setFormData({ ...formData, foodInstruction: f.id })}
+                    >
+                      <Utensils size={15} />
+                      <span>{f.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="form-field">
+                <label className="form-label">Additional Notes / Instructions (Optional)</label>
+                <textarea
+                  rows="2"
+                  className="form-textarea"
+                  placeholder="e.g. Drink plenty of warm water, take with milk..."
+                  value={formData.notes}
+                  onChange={e => setFormData({ ...formData, notes: e.target.value })}
+                />
+              </div>
+
+              <div className="form-actions-row">
+                <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+                <button type="submit" className="btn btn-primary">
+                  {isEditMode ? <><Check size={16} /> Save Changes</> : <><Plus size={16} /> Add Medicine</>}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      );
+    };
+
+    const MedicineCard = ({ medicine, onMarkTaken, onSkip, onEdit, onDelete }) => {
+      const getTypeIcon = (type) => {
+        switch (type) {
+          case 'Tablet': return <Tablet size={18} />;
+          case 'Capsule': return <Pill size={18} />;
+          case 'Syrup': return <Beaker size={18} />;
+          case 'Drops': return <Droplet size={18} />;
+          default: return <Syringe size={18} />;
+        }
+      };
+      const formatTime = (t) => {
+        if (!t) return '';
+        const [h, m] = t.split(':');
+        const hr = parseInt(h, 10);
+        return `${hr % 12 || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`;
+      };
+
+      const borderClass = medicine.status === 'taken' ? 'card-border-taken' : (medicine.status === 'skipped' ? 'card-border-skipped' : 'card-border-pending');
+      const badgeClass = medicine.status === 'taken' ? 'status-badge-taken' : (medicine.status === 'skipped' ? 'status-badge-skipped' : 'status-badge-pending');
+      const badgeIcon = medicine.status === 'taken' ? <CheckCircle2 size={14} /> : (medicine.status === 'skipped' ? <XCircle size={14} /> : <Clock size={14} />);
+
+      return (
+        <div className={`medicine-card ${borderClass}`}>
+          <div className="card-top-row">
+            <div className="card-type-chip">
+              <span className="type-icon">{getTypeIcon(medicine.type)}</span>
+              <span className="type-label">{medicine.type}</span>
+            </div>
+            <div className={`status-pill ${badgeClass}`}>
+              {badgeIcon}
+              <span className="capitalize">{medicine.status}</span>
+            </div>
+          </div>
+
+          <div className="card-main-info">
+            <h4 className="medicine-title">{medicine.name}</h4>
+            <div className="dosage-tag">Dosage: {medicine.dosage}</div>
+          </div>
+
+          <div className="card-meta-grid">
+            <div className="meta-item">
+              <Clock size={15} className="text-sky-600" />
+              <span className="meta-label">Time:</span>
+              <strong className="meta-value">{formatTime(medicine.time)}</strong>
+            </div>
+            <div className="meta-item">
+              <Utensils size={15} className="text-teal-600" />
+              <span className="food-badge food-after">{medicine.foodInstruction}</span>
+            </div>
+          </div>
+
+          {medicine.notes && (
+            <div className="card-notes-box">
+              <Info size={13} className="notes-icon" />
+              <p className="notes-text">{medicine.notes}</p>
+            </div>
+          )}
+
+          <div className="card-actions">
+            {medicine.status !== 'taken' ? (
+              <button type="button" className="card-btn btn-action-take" onClick={() => onMarkTaken(medicine.id)}>
+                <Check size={16} /> Mark as Taken
+              </button>
+            ) : (
+              <button type="button" className="card-btn btn-action-completed" onClick={() => onMarkTaken(medicine.id)}>
+                <CheckCircle2 size={16} /> Completed
+              </button>
+            )}
+
+            {medicine.status === 'pending' && (
+              <button type="button" className="card-btn btn-action-skip" onClick={() => onSkip(medicine.id)}>
+                <XCircle size={15} /> Skip
+              </button>
+            )}
+
+            {medicine.status === 'skipped' && (
+              <button type="button" className="card-btn btn-action-retry" onClick={() => onMarkTaken(medicine.id)}>
+                <Check size={15} /> Take Now
+              </button>
+            )}
+
+            <div className="card-action-icon-group">
+              <button type="button" className="icon-action-btn edit-btn" onClick={() => onEdit(medicine)} title="Edit"><Edit3 size={16} /></button>
+              <button type="button" className="icon-action-btn delete-btn" onClick={() => onDelete(medicine)} title="Delete"><Trash2 size={16} /></button>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    const StatisticsCards = ({ medicines }) => {
+      const total = medicines.length;
+      const taken = medicines.filter(m => m.status === 'taken').length;
+      const pending = medicines.filter(m => m.status === 'pending').length;
+      const skipped = medicines.filter(m => m.status === 'skipped').length;
+      const pct = total > 0 ? Math.round((taken / total) * 100) : 0;
+
+      return (
+        <div className="stats-grid">
+          <div className="stat-card stat-card-blue">
+            <div className="stat-card-top">
+              <div className="stat-icon-wrapper bg-blue-100 text-blue-600"><Pill size={22} /></div>
+              <span className="stat-badge">Full Regimen</span>
+            </div>
+            <h4 className="stat-card-title">Total Scheduled</h4>
+            <div className="stat-card-value">{total}</div>
+            <p className="stat-card-subtext">{total} active medicines</p>
+          </div>
+
+          <div className="stat-card stat-card-green">
+            <div className="stat-card-top">
+              <div className="stat-icon-wrapper bg-emerald-100 text-emerald-600"><CheckCircle2 size={22} /></div>
+              <span className="stat-badge">{pct}%</span>
+            </div>
+            <h4 className="stat-card-title">Medicines Taken</h4>
+            <div className="stat-card-value">{taken}</div>
+            <p className="stat-card-subtext">{pct}% completion rate</p>
+          </div>
+
+          <div className="stat-card stat-card-amber">
+            <div className="stat-card-top">
+              <div className="stat-icon-wrapper bg-amber-100 text-amber-600"><Clock size={22} /></div>
+              <span className="stat-badge">{pending > 0 ? 'Action Due' : 'All Clear'}</span>
+            </div>
+            <h4 className="stat-card-title">Pending Doses</h4>
+            <div className="stat-card-value">{pending}</div>
+            <p className="stat-card-subtext">{pending === 0 ? 'All doses taken!' : 'Awaiting schedule'}</p>
+          </div>
+
+          <div className="stat-card stat-card-rose">
+            <div className="stat-card-top">
+              <div className="stat-icon-wrapper bg-rose-100 text-rose-600"><XCircle size={22} /></div>
+              <span className="stat-badge">{skipped > 0 ? 'Skipped' : 'Zero'}</span>
+            </div>
+            <h4 className="stat-card-title">Skipped Doses</h4>
+            <div className="stat-card-value">{skipped}</div>
+            <p className="stat-card-subtext">{skipped === 0 ? 'No doses missed' : 'Needs attention'}</p>
+          </div>
+        </div>
+      );
+    };
+
+    const ProgressTracker = ({ medicines }) => {
+      const total = medicines.length;
+      const taken = medicines.filter(m => m.status === 'taken').length;
+      const pending = medicines.filter(m => m.status === 'pending').length;
+      const skipped = medicines.filter(m => m.status === 'skipped').length;
+      const percentage = total > 0 ? Math.round((taken / total) * 100) : 0;
+      const skippedPercent = total > 0 ? Math.round((skipped / total) * 100) : 0;
+
+      return (
+        <div className="progress-tracker-card">
+          <div className="progress-header">
+            <div className="progress-title-group">
+              <div className="progress-icon-badge"><Activity size={20} className="text-teal-600" /></div>
+              <div>
+                <h3 className="progress-main-title">Daily Adherence Tracker</h3>
+                <p className="progress-subtitle">Real-time medication intake completion</p>
+              </div>
+            </div>
+            <div className="progress-score-badge">
+              <span className="progress-score-num">{percentage}%</span>
+              <span className="progress-score-label">Completed</span>
+            </div>
+          </div>
+
+          <div className="progress-bar-container">
+            <div className="progress-bar-track">
+              <div className="progress-bar-segment segment-taken" style={{ width: `${percentage}%` }} />
+              <div className="progress-bar-segment segment-skipped" style={{ width: `${skippedPercent}%` }} />
+            </div>
+          </div>
+
+          <div className="progress-footer">
+            <div className="progress-legend">
+              <div className="legend-item"><span className="legend-dot dot-taken"></span><span>Taken ({taken})</span></div>
+              <div className="legend-item"><span className="legend-dot dot-pending"></span><span>Pending ({pending})</span></div>
+              <div className="legend-item"><span className="legend-dot dot-skipped"></span><span>Skipped ({skipped})</span></div>
+            </div>
+            <div className="progress-feedback">
+              <ShieldCheck size={16} className="text-teal-600" />
+              <span>{percentage === 100 ? 'Outstanding! 100% adherence today.' : `${pending} doses left. Keep up your routine!`}</span>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // --- Main App Component ---
+    function App() {
+      const [medicines, setMedicines] = useState(initialMedicines);
+      const [activeTab, setActiveTab] = useState('dashboard');
+      const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+      const [editingMedicine, setEditingMedicine] = useState(null);
+      const [deletingMedicine, setDeletingMedicine] = useState(null);
+      const [activeReminder, setActiveReminder] = useState(null);
+      const [notifiedDoseIds, setNotifiedDoseIds] = useState(new Set());
+      const [toasts, setToasts] = useState([]);
+      const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+      const [searchTerm, setSearchTerm] = useState('');
+      const [statusFilter, setStatusFilter] = useState('all');
+      const [currentTipIndex, setCurrentTipIndex] = useState(0);
+
+      const showToast = (message, type = 'success') => {
+        setToasts(prev => [...prev, { id: `t-${Date.now()}-${Math.random()}`, message, type }]);
+      };
+      const removeToast = (id) => setToasts(prev => prev.filter(t => t.id !== id));
+
+      // Background reminder checker
+      useEffect(() => {
+        const interval = setInterval(() => {
+          const now = new Date();
+          const curTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+          medicines.forEach(m => {
+            if (m.status === 'pending' && m.time === curTime && !notifiedDoseIds.has(m.id)) {
+              setActiveReminder(m);
+              setNotifiedDoseIds(prev => new Set(prev).add(m.id));
+              playChimeSound();
+              showToast(`Reminder alert: Time for ${m.name}!`, 'warning');
+            }
+          });
+        }, 10000);
+        return () => clearInterval(interval);
+      }, [medicines, notifiedDoseIds]);
+
+      // Cycle tips
+      useEffect(() => {
+        const tipTimer = setInterval(() => {
+          setCurrentTipIndex(prev => (prev + 1) % healthTips.length);
+        }, 12000);
+        return () => clearInterval(tipTimer);
+      }, []);
+
+      const handleSave = (medData) => {
+        if (editingMedicine) {
+          setMedicines(prev => prev.map(m => m.id === medData.id ? { ...medData } : m));
+          showToast(`Updated "${medData.name}" successfully!`, 'success');
+          setEditingMedicine(null);
+        } else {
+          setMedicines(prev => [medData, ...prev]);
+          showToast(`Added "${medData.name}" to schedule!`, 'success');
+        }
+      };
+
+      const handleMarkTaken = (id) => {
+        setMedicines(prev => prev.map(m => {
+          if (m.id === id) {
+            const next = m.status === 'taken' ? 'pending' : 'taken';
+            showToast(next === 'taken' ? `"${m.name}" marked as taken!` : `"${m.name}" reset to pending.`, next === 'taken' ? 'success' : 'info');
+            return { ...m, status: next };
+          }
+          return m;
+        }));
+        if (activeReminder && activeReminder.id === id) setActiveReminder(null);
+      };
+
+      const handleSkip = (id) => {
+        setMedicines(prev => prev.map(m => {
+          if (m.id === id) {
+            showToast(`"${m.name}" marked as skipped.`, 'warning');
+            return { ...m, status: 'skipped' };
+          }
+          return m;
+        }));
+        if (activeReminder && activeReminder.id === id) setActiveReminder(null);
+      };
+
+      const handleConfirmDelete = (id) => {
+        const m = medicines.find(x => x.id === id);
+        setMedicines(prev => prev.filter(x => x.id !== id));
+        showToast(`Removed "${m ? m.name : 'Medicine'}" from schedule.`, 'info');
+        setDeletingMedicine(null);
+      };
+
+      const handleTriggerTestReminder = () => {
+        const target = medicines.find(m => m.status === 'pending') || medicines[0];
+        if (target) {
+          setActiveReminder(target);
+          playChimeSound();
+          showToast('Test reminder triggered for presentation demo!', 'warning');
+        }
+      };
+
+      const pendingCount = medicines.filter(m => m.status === 'pending').length;
+      const takenCount = medicines.filter(m => m.status === 'taken').length;
+
+      // Filtered medicines
+      const filtered = medicines.filter(m => {
+        const matchSearch = m.name.toLowerCase().includes(searchTerm.toLowerCase().trim()) || m.notes.toLowerCase().includes(searchTerm.toLowerCase().trim());
+        const matchStatus = statusFilter === 'all' || m.status === statusFilter;
+        return matchSearch && matchStatus;
+      });
+
+      const nextDue = medicines.filter(m => m.status === 'pending').sort((a,b) => a.time.localeCompare(b.time))[0];
+
+      return (
+        <div className="app-root-layout">
+          {/* Sidebar */}
+          {mobileMenuOpen && <div className="sidebar-mobile-backdrop" onClick={() => setMobileMenuOpen(false)} />}
+          <aside className={`sidebar-container ${mobileMenuOpen ? 'sidebar-open' : ''}`}>
+            <div className="sidebar-brand">
+              <div className="brand-logo-icon"><HeartPulse size={24} className="text-white" /></div>
+              <div className="brand-text">
+                <h1 className="brand-title">MediCare</h1>
+                <span className="brand-subtitle">Smart Medicine Reminder</span>
+              </div>
+              {mobileMenuOpen && <button type="button" className="sidebar-close-btn" onClick={() => setMobileMenuOpen(false)}><X size={20} /></button>}
+            </div>
+
+            <div className="sidebar-quick-action">
+              <button type="button" className="sidebar-add-btn" onClick={() => { setEditingMedicine(null); setIsFormModalOpen(true); setMobileMenuOpen(false); }}>
+                <Pill size={18} /><span>+ Add Medicine</span>
+              </button>
+            </div>
+
+            <nav className="sidebar-nav">
+              <div className="nav-section-title">MAIN MENU</div>
+              <ul className="nav-list">
+                <li className="nav-item">
+                  <button type="button" className={`nav-link ${activeTab === 'dashboard' ? 'nav-link-active' : ''}`} onClick={() => { setActiveTab('dashboard'); setMobileMenuOpen(false); }}>
+                    <span className="nav-icon"><LayoutDashboard size={20} /></span>
+                    <span className="nav-label">Dashboard</span>
+                  </button>
+                </li>
+                <li className="nav-item">
+                  <button type="button" className={`nav-link ${activeTab === 'schedule' ? 'nav-link-active' : ''}`} onClick={() => { setActiveTab('schedule'); setMobileMenuOpen(false); }}>
+                    <span className="nav-icon"><CalendarDays size={20} /></span>
+                    <span className="nav-label">Today's Schedule</span>
+                    {pendingCount > 0 && <span className="nav-badge badge-amber">{pendingCount}</span>}
+                  </button>
+                </li>
+                <li className="nav-item">
+                  <button type="button" className={`nav-link ${activeTab === 'tips' ? 'nav-link-active' : ''}`} onClick={() => { setActiveTab('tips'); setMobileMenuOpen(false); }}>
+                    <span className="nav-icon"><Sparkles size={20} /></span>
+                    <span className="nav-label">Health & Tips</span>
+                  </button>
+                </li>
+              </ul>
+            </nav>
+
+            <div className="sidebar-compliance-card">
+              <div className="compliance-header"><CheckCircle2 size={16} className="text-emerald-500" /><span className="compliance-title">Today's Progress</span></div>
+              <div className="compliance-stats">
+                <div className="compliance-stat-item"><span className="stat-num text-emerald-600">{takenCount}</span><span className="stat-label">Taken</span></div>
+                <div className="compliance-stat-item"><span className="stat-num text-amber-600">{pendingCount}</span><span className="stat-label">Pending</span></div>
+              </div>
+              <div className="compliance-footer"><Clock size={12} /><span>Session Active</span></div>
+            </div>
+
+            <div className="sidebar-footer">
+              <div className="demo-badge"><span className="status-dot"></span><span className="demo-text">College Mini Project</span></div>
+              <p className="college-tag">10-Mark Academic Edition</p>
+            </div>
+          </aside>
+
+          {/* Main Content Area */}
+          <div className="app-main-viewport">
+            {/* Header */}
+            <header className="header-container">
+              <div className="header-left">
+                <button type="button" className="header-menu-btn" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}><Menu size={22} /></button>
+                <div className="header-date-badge">
+                  <Calendar size={16} className="text-sky-600" />
+                  <span className="header-date-text">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                </div>
+              </div>
+
+              <div className="header-actions">
+                <button type="button" className="btn btn-test-reminder" onClick={handleTriggerTestReminder}>
+                  <BellRing size={17} className="bell-ring-pulse text-amber-500" />
+                  <span className="test-btn-text">Test Reminder</span>
+                  <span className="test-pill">Demo</span>
+                </button>
+                <button type="button" className="btn btn-primary" onClick={() => { setEditingMedicine(null); setIsFormModalOpen(true); }}>
+                  <Plus size={18} /><span className="add-btn-text">Add Medicine</span>
+                </button>
+              </div>
+            </header>
+
+            {/* Body */}
+            <main className="app-body-container">
+              {activeTab === 'dashboard' && (
+                <div className="dashboard-content-wrapper">
+                  {/* Welcome Banner */}
+                  <div className="welcome-banner">
+                    <div className="welcome-banner-left">
+                      <div className="welcome-badge"><HeartPulse size={16} className="text-teal-600" /><span>Health & Medication Assistant</span></div>
+                      <h2 className="welcome-title">Good Morning! Take care of your health.</h2>
+                      <p className="welcome-subtitle">Welcome to MediCare. Keep your medication routine organized, on-track, and never miss a scheduled dose.</p>
+                      <div className="welcome-quick-actions">
+                        <button type="button" className="btn btn-primary" onClick={() => { setEditingMedicine(null); setIsFormModalOpen(true); }}><Plus size={16} /> Add New Medicine</button>
+                        <button type="button" className="btn btn-secondary" onClick={handleTriggerTestReminder}><BellRing size={16} className="text-amber-500" /> Test Reminder Alert</button>
+                      </div>
+                    </div>
+
+                    <div className="upcoming-dose-highlight">
+                      <div className="highlight-header"><span className="highlight-tag">NEXT UPCOMING DOSE</span><Clock size={15} className="text-sky-600" /></div>
+                      {nextDue ? (
+                        <div className="highlight-body">
+                          <div className="highlight-med-row">
+                            <div className="highlight-icon"><Pill size={22} className="text-sky-600" /></div>
+                            <div>
+                              <h4 className="highlight-name">{nextDue.name}</h4>
+                              <span className="highlight-dosage">{nextDue.dosage} • {nextDue.type}</span>
+                            </div>
+                          </div>
+                          <div className="highlight-time-box">
+                            <div className="time-display"><Clock size={16} /><span>Scheduled: {nextDue.time}</span></div>
+                            <span className="food-tag">{nextDue.foodInstruction}</span>
+                          </div>
+                          <button type="button" className="btn btn-take-quick" onClick={() => handleMarkTaken(nextDue.id)}>
+                            <CheckCircle2 size={16} /> Mark as Taken
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="highlight-empty">
+                          <CheckCircle2 size={32} className="text-emerald-500 mb-2" />
+                          <h4>All Caught Up!</h4>
+                          <p>No pending medicines scheduled right now.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Health Tip Banner */}
+                  <div className="health-tip-banner">
+                    <div className="tip-icon-box"><Sparkles size={20} className="text-amber-500" /></div>
+                    <div className="tip-content">
+                      <span className="tip-category">Daily Health Wisdom • {healthTips[currentTipIndex].category}</span>
+                      <p className="tip-quote">"{healthTips[currentTipIndex].tip}"</p>
+                    </div>
+                  </div>
+
+                  {/* Statistics & Progress */}
+                  <StatisticsCards medicines={medicines} />
+                  <ProgressTracker medicines={medicines} />
+
+                  {/* Schedule List */}
+                  <div className="dashboard-section-header">
+                    <div>
+                      <h3 className="section-main-title">Today's Medicine Schedule</h3>
+                      <p className="section-subtitle">Real-time medication roster with interactive controls</p>
+                    </div>
+                  </div>
+
+                  <div className="medicine-list-section">
+                    <div className="list-controls-bar">
+                      <div className="search-input-wrapper">
+                        <Search size={18} className="search-icon" />
+                        <input
+                          type="text"
+                          className="search-input"
+                          placeholder="Search medicine by name or notes..."
+                          value={searchTerm}
+                          onChange={e => setSearchTerm(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="filter-pills-group">
+                        <button type="button" className={`filter-pill ${statusFilter === 'all' ? 'filter-pill-active' : ''}`} onClick={() => setStatusFilter('all')}>
+                          <span>All</span><span className="pill-count">{medicines.length}</span>
+                        </button>
+                        <button type="button" className={`filter-pill ${statusFilter === 'pending' ? 'filter-pill-active' : ''}`} onClick={() => setStatusFilter('pending')}>
+                          <span>Pending</span><span className="pill-count">{pendingCount}</span>
+                        </button>
+                        <button type="button" className={`filter-pill ${statusFilter === 'taken' ? 'filter-pill-active' : ''}`} onClick={() => setStatusFilter('taken')}>
+                          <span>Taken</span><span className="pill-count">{takenCount}</span>
+                        </button>
+                        <button type="button" className={`filter-pill ${statusFilter === 'skipped' ? 'filter-pill-active' : ''}`} onClick={() => setStatusFilter('skipped')}>
+                          <span>Skipped</span><span className="pill-count">{medicines.filter(m => m.status === 'skipped').length}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {filtered.length > 0 ? (
+                      <div className="medicine-cards-grid">
+                        {filtered.map(med => (
+                          <MedicineCard
+                            key={med.id}
+                            medicine={med}
+                            onMarkTaken={handleMarkTaken}
+                            onSkip={handleSkip}
+                            onEdit={(m) => { setEditingMedicine(m); setIsFormModalOpen(true); }}
+                            onDelete={(m) => setDeletingMedicine(m)}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="empty-state-card">
+                        <div className="empty-icon-circle"><Pill size={36} className="text-sky-500" /></div>
+                        <h3 className="empty-title">No Medications Found</h3>
+                        <p className="empty-description">Try adjusting your search query or reset filter.</p>
+                        <button type="button" className="btn btn-primary" onClick={() => { setSearchTerm(''); setStatusFilter('all'); }}>Reset Filters</button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'schedule' && (
+                <div className="schedule-view-page">
+                  <div className="page-header-row">
+                    <div>
+                      <h2 className="page-main-title">Today's Medicine Schedule</h2>
+                      <p className="page-subtitle">Track, filter, and manage your daily medications</p>
+                    </div>
+                    <button type="button" className="btn btn-primary" onClick={() => { setEditingMedicine(null); setIsFormModalOpen(true); }}>+ Add Medicine</button>
+                  </div>
+                  <ProgressTracker medicines={medicines} />
+                  <div className="mt-8">
+                    <div className="medicine-cards-grid">
+                      {medicines.map(med => (
+                        <MedicineCard
+                          key={med.id}
+                          medicine={med}
+                          onMarkTaken={handleMarkTaken}
+                          onSkip={handleSkip}
+                          onEdit={(m) => { setEditingMedicine(m); setIsFormModalOpen(true); }}
+                          onDelete={(m) => setDeletingMedicine(m)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'tips' && (
+                <div className="health-tips-page">
+                  <div className="page-header-row">
+                    <div>
+                      <h2 className="page-main-title">Health & Wellness Advisory</h2>
+                      <p className="page-subtitle">Medication safety advice and daily wellness routines</p>
+                    </div>
+                  </div>
+                  <div className="tips-grid">
+                    {healthTips.map(tip => (
+                      <div key={tip.id} className="tip-card-detailed">
+                        <div className="tip-badge-category"><Sparkles size={15} className="text-amber-500" /><span>{tip.category}</span></div>
+                        <p className="tip-detailed-text">"{tip.tip}"</p>
+                        <div className="tip-footer-pill"><ShieldCheck size={14} className="text-teal-600" /><span>Medical Safety Recommendation</span></div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-8"><StatisticsCards medicines={medicines} /></div>
+                </div>
+              )}
+            </main>
+          </div>
+
+          {/* Modals & Popups */}
+          <AddMedicineForm
+            isOpen={isFormModalOpen}
+            onClose={() => { setIsFormModalOpen(false); setEditingMedicine(null); }}
+            onSubmit={handleSave}
+            initialData={editingMedicine}
+          />
+          <DeleteConfirmModal
+            medicine={deletingMedicine}
+            onConfirm={handleConfirmDelete}
+            onCancel={() => setDeletingMedicine(null)}
+          />
+          <ReminderNotification
+            reminder={activeReminder}
+            onDismiss={() => setActiveReminder(null)}
+            onMarkTaken={handleMarkTaken}
+          />
+          <ToastContainer toasts={toasts} onClose={removeToast} />
+        </div>
+      );
+    }
+
+    // Render App
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
